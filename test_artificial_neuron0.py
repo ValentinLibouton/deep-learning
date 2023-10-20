@@ -24,7 +24,8 @@ def model(X, W, b):
 A = model(X, W, b)
 
 def log_loss(A, y):
-    return 1 / len(y) * np.sum(-y * np.log(A) - (1 - y) * np.log(1 - A))
+    epsilon = 1e-15  # permet de ne pas avoir d'erreurs de calcul avec A = 0 ou = 1
+    return 1 / len(y) * np.sum(-y * np.log(A + epsilon) - (1 - y) * np.log(1 - A + epsilon))
 
 def gradients(A, X, y):
     dW = 1 / len(y) * np.dot(X.T, A - y)
