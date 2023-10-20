@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
+from utilities import *
+from tqdm import tqdm
 
 class ArtificialNeuron:
-    def __init__(self, learning_rate=0.1, n_iter=100):
+    def __init__(self, learning_rate=0.01, n_iter=1000):
         """
        Initialize an Artificial Neuron.
 
@@ -14,8 +16,12 @@ class ArtificialNeuron:
        """
         self.learning_rate = learning_rate
         self.n_iter = n_iter
+        self.train_loss_history = []  # Perte sur les données d'entraînement
+        self.train_accuracy_history = []  # Performance sur les données d'entraînement
+        self.test_loss_history = []  # Perte sur les données de test
+        self.test_accuracy_history = []  # Performance sur les données de test
 
-    def fit(self, X, y):
+    def fit(self, X_train, y_train, X_test, y_test):
         """
         Train the Artificial Neuron on input data.
 
@@ -23,18 +29,27 @@ class ArtificialNeuron:
         - X (numpy.ndarray): Input features.
         - y (numpy.ndarray): Target labels.
         """
-        self.W, self.b = self._initialize(X)
-        self.loss_history = []
+        self.W, self.b = self._initialize(X_train)
 
-        for _ in range(self.n_iter):
-            A = self._model(X)
-            self.loss_history.append(self._log_loss(A, y))
-            dW, db = self._gradients(A, X, y)
+        for i in tqdm(range(self.n_iter)):
+            A = self._model(X_train)  # Activations
+
+            if i % 10 == 0:  # On calcul la perf et la perte 1x/10 pour ne pas trop perdre en temps de calcul
+                # Train
+                self.train_loss_history.append(self._log_loss(A, y_train))
+                y_pred = self.predict(X_train)
+                self.train_accuracy_history.append(accuracy_score(y_train, y_pred))
+
+                # Test
+                A_test = self._model(X_test)
+                self.test_loss_history.append(self._log_loss(A_test, y_test))
+                y_pred = self.predict(X_test)
+                self.test_accuracy_history.append(accuracy_score(y_test, y_pred))
+
+            # Update
+            dW, db = self._gradients(A, X_train, y_train)
             self.W, self.b = self._update(dW, db)
 
-        y_pred = self.predict(X)
-        accuracy = accuracy_score(y, y_pred)
-        print("Performance: ", accuracy)
 
     def predict(self, X):
         """
@@ -87,7 +102,7 @@ class ArtificialNeuron:
         Returns:
         - float: Logistic loss.
         """
-        epsilon = 1e-15 # permet de ne pas avoir d'erreurs de calcul avec A = 0 ou = 1
+        epsilon = 1e-15  # permet de ne pas avoir d'erreurs de calcul avec A = 0 ou = 1
         return 1 / len(y) * np.sum(-y * np.log(A + epsilon) - (1 - y) * np.log(1 - A + epsilon))
 
     def _gradients(self, A, X, y):
@@ -123,54 +138,100 @@ class ArtificialNeuron:
         self.b = self.b - self.learning_rate * db
         return self.W, self.b
 
-def main():
-    # Generate datas
+    def plot_loss_curve(self):
+        iterations = range(len(self.train_loss_history))
+        plt.figure(figsize=(12, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.plot(iterations, self.train_loss_history, label='Train Loss')
+        plt.plot(iterations, self.test_loss_history, label='Test Loss')
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.title('Loss Curve')
+        plt.legend()
+
+    def plot_accuracy_curve(self):
+        iterations = range(len(self.train_accuracy_history))
+        plt.figure(figsize=(12, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.plot(iterations, self.train_accuracy_history, label='Train Accuracy')
+        plt.plot(iterations, self.test_accuracy_history, label='Test Accuracy')
+        plt.xlabel('Iteration')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy Curve')
+        plt.legend()
+
+    def plot_learning_and_accuracy_curve(self):
+        iterations = range(len(self.train_loss_history))
+        plt.figure(figsize=(12, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.plot(iterations, self.train_loss_history, label='Train Loss')
+        plt.plot(iterations, self.test_loss_history, label='Test Loss')
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.title('Loss Curve')
+        plt.legend()
+
+        plt.subplot(1, 2, 2)
+        plt.plot(iterations, self.train_accuracy_history, label='Train Accuracy')
+        plt.plot(iterations, self.test_accuracy_history, label='Test Accuracy')
+        plt.xlabel('Iteration')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy Curve')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+
+def generate_data():
+    # Generate synthetic data
     X, y = make_blobs(n_samples=100, n_features=2, centers=2, random_state=0)
     y = y.reshape((y.shape[0], 1))
-    print('Dimensions de X:', X.shape)
-    print('Dimensions de y:', y.shape)
+    return X, y
 
-    # Model initialization
-    model = ArtificialNeuron()
+def reshape_data(X_train, X_test):
+    # Reshape the data
+    X_train_reshape = X_train.reshape(X_train.shape[0], -1) / X_train.max()
+    X_test_reshape = X_test.reshape(X_test.shape[0], -1) / X_train.max()
+    return X_train_reshape, X_test_reshape
 
-    # Model training
-    model.fit(X, y)
+def plot_data(X, y):
+    # Create a scatter plot of the data
+    plt.scatter(X[y.ravel() == 0, 0], X[y.ravel() == 0, 1], c='blue', label='Class 0')
+    plt.scatter(X[y.ravel() == 1, 0], X[y.ravel() == 1, 1], c='red', label='Class 1')
+    plt.legend()
 
-    # You create a new_point data point with coordinates(2, 1).
-    # This data point will be used to show how the model classifies this new data.
-    new_point = np.array([2, 1])
 
-    # You create a set of 100 equally spaced values in the range -1 to 4.
-    # These x0 values will be used to draw the model's decision line.
+
+def plot_decision_boundary(model, X, y):
+    # Plot the decision boundary of the model
     x0 = np.linspace(-1, 4, 100)
-
-    # You use the weights and bias learned by the model (model.W and model.b) to calculate the corresponding values of
-    # x1. These values represent the model's decision boundary, indicating how the model would classify the data in this
-    # two-dimensional space.
     x1 = (-model.W[0] * x0 - model.b) / model.W[1]
-
-    # Create a scatter plot of the training data (X). The data is distributed on the chart based on the first two
-    # columns of X, that is, X[:, 0] on the x-axis and X[:, 1] on the y-axis. The color of the points is determined by
-    # the y class labels (0 or 1) using the 'summer' colormap. The points corresponding to each class will have
-    # different colors.
-    plt.scatter(X[:, 0], X[:, 1], c=y, cmap='summer')
-
-    # Adds a red point ('r') on the scatter plot to represent the new_point. This allows you to visualize
-    # where this point is in relation to the other data.
-    plt.scatter(new_point[0], new_point[1], c='r')
-
-    # Draws a decision line using the values x0 (x coordinates) and x1 (y coordinates) calculated previously.
-    # The decision line is drawn in orange ('c') with a line width (lw) of 3 pixels. The decision line shows how the
-    # model divides the space based on its learned weights and biases.
     plt.plot(x0, x1, c='orange', lw=3)
-    plt.show()
 
-    # Prediction
-    # Calls the model's predict method (model.predict(new_point)) to make a prediction on the new_point data point.
-    # The predict method will return True if the model classifies new_point as class 1 and False if it classifies it as
-    # class 0 (using the default 0.5 threshold rule).
-    prediction = model.predict(new_point)
-    print("Prediction for new data point:", prediction)
+
+
+
+def main():
+    X_train, y_train, X_test, y_test = load_data()
+
+    X_train_reshape, X_test_reshape = reshape_data(X_train, X_test)
+
+
+    print('Dimensions de X_train:', X_train_reshape.shape)
+    print('Dimensions de y_train:', y_train.shape)
+
+    model = ArtificialNeuron(n_iter=10000, learning_rate=0.01)
+    model.fit(X_train=X_train_reshape, y_train=y_train, X_test=X_test_reshape, y_test=y_test)
+
+    model.plot_loss_curve()  # Affiche la courbe d'apprentissage
+    model.plot_accuracy_curve()
+    model.plot_learning_and_accuracy_curve()
+
+    #prediction = model.predict(X_test_reshape)
+    #print("Prediction for new data points:", prediction)
 
 if __name__ == "__main__":
     main()
